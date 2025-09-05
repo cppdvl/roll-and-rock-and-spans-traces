@@ -1,207 +1,213 @@
-# OpenTelemetry Diagnostics Toolkit
+# OpenTelemetry Tools
 
-A comprehensive bash script for diagnosing OpenTelemetry setup, OTLP collector, Jaeger integration, and trace data flow.
+A comprehensive toolkit for managing OpenTelemetry distributed tracing with multiple backend options.
 
-## Quick Start
+## 🏗️ **Architecture**
 
+This toolkit provides two distinct tracing backends:
+
+### **📁 Jaeger/** - Traditional Jaeger Setup
+- **Jaeger All-in-One**: Classic tracing backend
+- **OpenTelemetry Collector**: OTLP → Jaeger pipeline
+- **Web UI**: Simple trace viewing and search
+- **Best for**: Getting started, simple deployments
+
+### **📁 TempoGrafana/** - Modern Tempo + Grafana Setup  
+- **Grafana Tempo**: High-scale distributed tracing backend
+- **Grafana**: Rich visualization and dashboards
+- **Prometheus**: Metrics collection and monitoring
+- **TraceQL**: Advanced trace query language
+- **Best for**: Production, advanced analytics, correlations
+
+## 🚀 **Quick Start**
+
+### **Option 1: Jaeger (Simple)**
 ```bash
-# Make the script executable (if not already)
-chmod +x /home/julianguarin/Intelepeer/otel-tools/otel-diagnostics.sh
+cd Jaeger/
+./otel-jaeger-diagnostics.sh start_jaeger
+./otel-jaeger-diagnostics.sh jaeger_health
+./otel-jaeger-diagnostics.sh send_test_jaeger
 
-# Run a comprehensive health check
+# Access Jaeger UI: http://localhost:16686
+```
+
+### **Option 2: Tempo + Grafana (Advanced)**
+```bash
+cd TempoGrafana/
+./otel-tempo-diagnostics.sh start_tempo
+./otel-tempo-diagnostics.sh tempo_health
+./otel-tempo-diagnostics.sh send_test_tempo
+
+# Access Grafana: http://localhost:3000 (admin/admin)
+# Access Tempo API: http://localhost:3200
+```
+
+## 📊 **Feature Comparison**
+
+| Feature | Jaeger | Tempo + Grafana |
+|---------|---------|-----------------|
+| **Setup Complexity** | Simple | Moderate |
+| **Query Language** | Basic search | TraceQL |
+| **Visualization** | Basic UI | Rich dashboards |
+| **Scalability** | Good | Excellent |
+| **Storage** | Memory/Cassandra | Object storage |
+| **Correlations** | Traces only | Traces + Metrics + Logs |
+| **Service Maps** | Basic | Advanced |
+| **Alerting** | None | Built-in |
+
+## 🔧 **Management Commands**
+
+### **Root Directory Commands**
+```bash
+# Start/stop everything
+./start-jaeger.sh           # Start Jaeger stack
+./start-tempo.sh            # Start Tempo/Grafana stack
+./stop-all.sh               # Stop all containers
+
+# Quick health checks
+./health-check.sh           # Check both stacks
+```
+
+### **Jaeger Commands**
+```bash
+cd Jaeger/
+./otel-jaeger-diagnostics.sh start_jaeger
+./otel-jaeger-diagnostics.sh jaeger_health
+./otel-jaeger-diagnostics.sh send_test_jaeger
+./otel-jaeger-diagnostics.sh run_billing_jaeger
+
+# Legacy full diagnostics
 ./otel-diagnostics.sh health_check
-
-# Show all available functions
-./otel-diagnostics.sh help
+./otel-diagnostics.sh services
+./otel-diagnostics.sh traces billing-service
 ```
 
-## Key Functions
-
-### Basic Diagnostics
-- **`health_check`** - Comprehensive system health check (recommended first step)
-- **`check_containers`** - Verify Docker containers are running
-- **`check_otlp_connectivity`** - Test OTLP and Jaeger endpoint connectivity
-- **`check_collector_logs`** - View OpenTelemetry collector logs
-
-### Trace Analysis
-- **`list_jaeger_services`** - List all services sending traces to Jaeger
-- **`get_recent_traces [service]`** - Get recent traces for a service
-- **`get_trace_details <trace_id>`** - Detailed analysis of a specific trace
-- **`monitor_traces [service]`** - Real-time trace monitoring
-
-### Service-Specific Queries
-- **`query_all_services [limit]`** - Query recent traces for all services at once
-- **`query_by_operation <service> <operation> [limit]`** - Find traces by specific operation name
-- **`get_service_stats [service] [hours]`** - Detailed statistics and analysis for a service
-- **`compare_services`** - Performance comparison table across all services
-
-### Sample Applications
-- **`run_billing_sample`** - Run the billing session sample to generate test traces
-
-## Common Usage Patterns
-
-### Initial Setup Verification
+### **Tempo/Grafana Commands**
 ```bash
-# Check if everything is working
-./otel-diagnostics.sh health_check
-
-# View recent traces from billing service
-./otel-diagnostics.sh get_recent_traces billing-service
-
-# Generate new test traces
-./otel-diagnostics.sh run_billing_sample
+cd TempoGrafana/
+./otel-tempo-diagnostics.sh start_tempo
+./otel-tempo-diagnostics.sh tempo_health
+./otel-tempo-diagnostics.sh query_tempo billing-service
+./otel-tempo-diagnostics.sh send_test_tempo
+./otel-tempo-diagnostics.sh run_billing_tempo
 ```
 
-### Troubleshooting
+## 🌐 **UI Access Points**
+
+### **Jaeger Setup**
+- **Jaeger UI**: http://localhost:16686
+- **OTLP Endpoints**: 
+  - HTTP: http://localhost:4318
+  - gRPC: localhost:4317
+
+### **Tempo/Grafana Setup**
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Tempo API**: http://localhost:3200
+- **Prometheus**: http://localhost:9090
+- **OTLP Endpoints**: 
+  - HTTP: http://localhost:4319
+  - gRPC: localhost:4320
+
+## 🎯 **Use Cases**
+
+### **Development & Testing**
 ```bash
-# Check container status
-./otel-diagnostics.sh check_containers
+# Start Jaeger for quick development
+cd Jaeger/ && ./otel-jaeger-diagnostics.sh start_jaeger
 
-# View collector logs for errors
-./otel-diagnostics.sh check_collector_logs 100
-
-# Test connectivity
-./otel-diagnostics.sh check_otlp_connectivity
+# Send your application traces
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
 ```
 
-### Trace Analysis
+### **Production & Analytics**
 ```bash
-# List available services
-./otel-diagnostics.sh list_jaeger_services
+# Start Tempo/Grafana for production monitoring
+cd TempoGrafana/ && ./otel-tempo-diagnostics.sh start_tempo
 
-# Query all services at once
-./otel-diagnostics.sh query_all_services 3
-
-# Get recent traces for specific service
-./otel-diagnostics.sh get_recent_traces billing-service 5
-
-# Find traces by operation name
-./otel-diagnostics.sh query_by_operation billing-service process-payment-000001 5
-
-# Get detailed service statistics
-./otel-diagnostics.sh get_service_stats billing-service 12
-
-# Compare performance across services
-./otel-diagnostics.sh compare_services
-
-# Analyze specific trace (replace with actual trace ID)
-./otel-diagnostics.sh get_trace_details f8691ebe008a7aaf14e458f139802b6b
-
-# Monitor traces in real-time
-./otel-diagnostics.sh monitor_traces billing-service 3
+# Configure applications for Tempo
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4319"
 ```
 
-## Dependencies
-
-The script requires these tools:
-- **docker** - For container management
-- **curl** - For API calls
-- **jq** - For JSON processing
-- **nc** (netcat) - For port testing
-
-Install missing dependencies:
+### **Billing Session Tracing**
 ```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install docker.io curl jq netcat-openbsd
-
-# Or check what's missing
-./otel-diagnostics.sh check_dependencies
+# Run billing examples against either backend
+cd Jaeger/ && ./otel-jaeger-diagnostics.sh run_billing_jaeger
+# OR
+cd TempoGrafana/ && ./otel-tempo-diagnostics.sh run_billing_tempo
 ```
 
-## Expected Infrastructure
+## 🔄 **Migration Path**
 
-The script assumes this OpenTelemetry stack:
-- **OpenTelemetry Collector** container named `otel-collector`
-- **Jaeger** container named `jaeger`
-- **OTLP HTTP** endpoint on port `4318`
-- **OTLP GRPC** endpoint on port `4317`
-- **Jaeger UI** on port `16686`
+### **Jaeger → Tempo Migration**
+1. **Start both stacks** (different ports)
+2. **Duplicate traces** to both backends
+3. **Validate Tempo setup** with test data
+4. **Switch applications** to Tempo endpoints
+5. **Decommission Jaeger** when ready
 
-## Output Examples
-
-### Health Check
-```
-========================================
-OpenTelemetry Stack Health Check
-========================================
-
-[SUCCESS] All dependencies are available
-[SUCCESS] OpenTelemetry Collector is running
-[SUCCESS] Jaeger is running
-[SUCCESS] OTLP HTTP endpoint is accessible
-[SUCCESS] Jaeger UI is accessible
-[SUCCESS] Available services in Jaeger:
-  • billing-service
-  • jaeger-all-in-one
-
-✅ OpenTelemetry stack is healthy!
-```
-
-### Recent Traces
-```
-========================================
-Getting Recent Traces for Service: billing-service
-========================================
-
-[SUCCESS] Found 3 traces for service 'billing-service'
-
-TraceID: f8691ebe008a7aaf14e458f139802b6b
-Spans: 7
-Duration: 425950μs
-Start Time: 2025-01-04 17:02:28
-Operations: session-start-000000, process-payment-000001, payment-gateway-call-000002, add-usage-charge-000003, session-end-000004, generate-bill-000005, billable-session-sess-001-session_root
----
-```
-
-## Integration with Existing Workflow
-
-This diagnostic script complements your existing OpenTelemetry setup by providing:
-
-1. **Quick Health Checks** - Verify everything is working before running applications
-2. **Trace Verification** - Confirm traces are being generated and stored correctly
-3. **Troubleshooting** - Identify issues with collector, Jaeger, or connectivity
-4. **Development Support** - Monitor traces during development and testing
-
-## Customization
-
-You can modify the script configuration at the top:
 ```bash
-OTLP_HTTP_PORT=4318
-OTLP_GRPC_PORT=4317
-JAEGER_UI_PORT=16686
-OTEL_COLLECTOR_NAME="otel-collector"
-JAEGER_CONTAINER_NAME="jaeger"
+# Run both simultaneously
+cd Jaeger/ && ./otel-jaeger-diagnostics.sh start_jaeger
+cd TempoGrafana/ && ./otel-tempo-diagnostics.sh start_tempo
+
+# Send traces to both
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"  # Jaeger
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4319"  # Tempo
 ```
 
-## Troubleshooting Common Issues
+## 🛠️ **Troubleshooting**
 
-### Container Not Running
+### **Port Conflicts**
 ```bash
-# Check container status
-./otel-diagnostics.sh check_containers
-
-# Start containers if needed
-docker start otel-collector jaeger
-```
-
-### No Traces Found
-```bash
-# Generate test traces
-./otel-diagnostics.sh run_billing_sample
-
-# Check collector is receiving data
-./otel-diagnostics.sh check_collector_logs
-
-# Verify services are listed
-./otel-diagnostics.sh list_jaeger_services
-```
-
-### Connectivity Issues
-```bash
-# Test all endpoints
-./otel-diagnostics.sh check_otlp_connectivity
-
-# Check if ports are bound correctly
+# Check what's running
 docker ps
+
+# Stop everything
+./stop-all.sh
+
+# Start specific stack
+cd Jaeger/ && ./otel-jaeger-diagnostics.sh start_jaeger
 ```
+
+### **No Traces Appearing**
+```bash
+# Send test traces
+cd Jaeger/ && ./otel-jaeger-diagnostics.sh send_test_jaeger
+cd TempoGrafana/ && ./otel-tempo-diagnostics.sh send_test_tempo
+
+# Check container logs
+docker logs otel-collector
+docker logs jaeger
+docker logs tempo
+```
+
+### **Container Issues**
+```bash
+# Health checks
+cd Jaeger/ && ./otel-jaeger-diagnostics.sh jaeger_health
+cd TempoGrafana/ && ./otel-tempo-diagnostics.sh tempo_health
+
+# Container status
+docker ps -a
+```
+
+## 📚 **Documentation**
+
+- **Jaeger Setup**: `Jaeger/README.md`
+- **Tempo/Grafana Setup**: `TempoGrafana/README-TEMPO-GRAFANA.md`
+- **OpenTelemetry Docs**: https://opentelemetry.io/docs/
+- **Jaeger Docs**: https://www.jaegertracing.io/docs/
+- **Tempo Docs**: https://grafana.com/docs/tempo/
+- **TraceQL Reference**: https://grafana.com/docs/tempo/latest/traceql/
+
+## 🎯 **Next Steps**
+
+1. **Choose your backend**: Jaeger (simple) or Tempo+Grafana (advanced)
+2. **Start the stack**: Follow the Quick Start guide above
+3. **Send test traces**: Verify everything works
+4. **Configure applications**: Point to the appropriate OTLP endpoint
+5. **Monitor and analyze**: Use the UI to explore your traces
+
+---
+
+**🚀 Happy Tracing!**

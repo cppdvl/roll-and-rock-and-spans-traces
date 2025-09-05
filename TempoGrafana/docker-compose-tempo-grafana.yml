@@ -1,0 +1,94 @@
+# Docker Compose for Tempo + Grafana OpenTelemetry Stack
+# This complements the existing Jaeger setup with Tempo/Grafana for trace visualization
+version: '3.8'
+
+services:
+  # Grafana Tempo - Distributed tracing backend
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/tmp/tempo
+    user: "0:0"  # Run as root to avoid permission issues
+    ports:
+      - "3200:3200"     # Tempo HTTP API
+      - "4320:4317"     # OTLP gRPC receiver (different port to avoid Jaeger conflict)
+      - "4319:4318"     # OTLP HTTP receiver (different port to avoid Jaeger conflict)
+      - "14251:14250"   # Jaeger gRPC receiver (different port to avoid conflict)
+    networks:
+      - tempo-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3200/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana - Visualization and dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"     # Grafana UI
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - tempo-network
+    depends_on:
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OpenTelemetry Collector configured for Tempo
+  otel-collector-tempo:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector-tempo
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-tempo-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4319:4318"     # OTLP HTTP receiver (different port to avoid conflict)
+      - "4320:4317"     # OTLP gRPC receiver (different port to avoid conflict)
+      - "8890:8888"     # Prometheus metrics (different port to avoid conflict)
+    networks:
+      - tempo-network
+    depends_on:
+      tempo:
+        condition: service_healthy
+
+  # Prometheus for metrics (optional, complements tracing)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"     # Prometheus UI
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - tempo-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+volumes:
+  tempo-data:
+  grafana-data:
+  prometheus-data:
+
+networks:
+  tempo-network:
+    driver: bridge
