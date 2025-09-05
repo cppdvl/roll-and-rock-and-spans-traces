@@ -19,10 +19,12 @@ NC='\033[0m' # No Color
 TEMPO_PORT=3200
 GRAFANA_PORT=3000
 PROMETHEUS_PORT=9090
+OTLP_HTTP_PORT=4318
+OTLP_GRPC_PORT=4317
 TEMPO_CONTAINER_NAME="tempo"
 GRAFANA_CONTAINER_NAME="grafana"
 PROMETHEUS_CONTAINER_NAME="prometheus"
-OTEL_COLLECTOR_TEMPO_NAME="otel-collector-tempo"
+# Note: otel-collector-tempo removed - Tempo has built-in OTLP receivers
 
 # Utility functions
 log_info() {
@@ -91,7 +93,7 @@ stop_tempo_stack() {
 check_tempo_containers() {
   log_header "Checking Tempo/Grafana Containers"
   
-  local containers=("$TEMPO_CONTAINER_NAME" "$GRAFANA_CONTAINER_NAME" "$PROMETHEUS_CONTAINER_NAME" "$OTEL_COLLECTOR_TEMPO_NAME")
+  local containers=("$TEMPO_CONTAINER_NAME" "$GRAFANA_CONTAINER_NAME" "$PROMETHEUS_CONTAINER_NAME")
   
   for container in "${containers[@]}"; do
     log_info "Checking $container container..."
@@ -106,7 +108,7 @@ check_tempo_containers() {
   done
   
   log_info "All Tempo/Grafana containers:"
-  docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | grep -E "(tempo|grafana|prometheus|otel-collector-tempo)"
+  docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}" | grep -E "(tempo|grafana|prometheus)"
 }
 
 # Check Tempo/Grafana connectivity
@@ -167,8 +169,34 @@ check_tempo_stack() {
 
 # Query traces from Tempo
 query_tempo_traces() {
-  local service_name="${1:-billing-service}"
+  local service_name="$1"
   local limit="${2:-10}"
+  
+  if [ -z "$service_name" ]; then
+    log_header "Available Services in Tempo"
+    log_info "Getting list of available services..."
+    
+    if curl -s "http://localhost:$TEMPO_PORT/api/search/tag/service.name/values" > /tmp/tempo_services_full.json 2>/dev/null; then
+      local service_count
+      service_count=$(jq '.tagValues | length' /tmp/tempo_services_full.json)
+      
+      if [ "$service_count" -gt 0 ]; then
+        log_success "Found $service_count services with trace data:"
+        echo
+        jq -r '.tagValues[] | "  • \(.)"' /tmp/tempo_services_full.json
+        echo
+        log_info "Usage: query_tempo <service_name> [limit]"
+        log_info "Example: ./otel-tempo-diagnostics.sh query_tempo tempo-test-service"
+      else
+        log_warning "No services found in Tempo"
+      fi
+    else
+      log_error "Failed to retrieve services from Tempo"
+    fi
+    
+    rm -f /tmp/tempo_services_full.json
+    return 0
+  fi
   
   log_header "Querying Traces from Tempo: $service_name"
   
@@ -195,7 +223,7 @@ query_tempo_traces() {
     log_success "Found $trace_count traces for service '$service_name'"
     echo
     
-    jq -r '.traces[] | "TraceID: \(.traceID)\nDuration: \(.durationMs)ms\nStart Time: \(.startTimeUnixNano / 1000000000 | strftime("%Y-%m-%d %H:%M:%S"))\nSpan Count: \(.spanSet.spans | length)\n---"' /tmp/tempo_traces.json
+    jq -r '.traces[] | "TraceID: \(.traceID)\nService: \(.rootServiceName)\nSpan: \(.rootTraceName)\nDuration: \(.durationMs)ms\nStart Time: \(.startTimeUnixNano)\n---"' /tmp/tempo_traces.json
   else
     log_warning "No traces found for service '$service_name'"
     log_info "Make sure the service has sent traces to Tempo recently"
@@ -300,7 +328,7 @@ send_test_trace_to_tempo() {
     }]
   }'
   
-  if curl -X POST "http://localhost:4319/v1/traces" \
+  if curl -X POST "http://localhost:$OTLP_HTTP_PORT/v1/traces" \
        -H "Content-Type: application/json" \
        -d "$test_trace" > /dev/null 2>&1; then
     log_success "Test trace sent to Tempo successfully!"
@@ -361,7 +389,7 @@ show_help() {
   echo "  tempo_connectivity - Test Tempo/Grafana endpoints"
   echo
   echo -e "${GREEN}Trace Operations:${NC}"
-  echo "  query_tempo [service] [limit] - Query traces from Tempo (default: billing-service, 10)"
+  echo "  query_tempo [service] [limit] - Query traces from Tempo (shows available services if no service specified)"
   echo "  get_tempo_trace <trace_id>    - Get detailed trace from Tempo"
   echo "  send_test_tempo              - Send test trace to Tempo"
   echo
@@ -371,7 +399,8 @@ show_help() {
   echo -e "${GREEN}Examples:${NC}"
   echo "  $0 start_tempo                    # Start the Tempo/Grafana stack"
   echo "  $0 tempo_health                   # Check stack health"  
-  echo "  $0 query_tempo billing-service 5  # Get 5 recent traces"
+  echo "  $0 query_tempo                    # List all services with data"
+  echo "  $0 query_tempo tempo-test-service 5  # Get 5 recent traces for specific service"
   echo "  $0 send_test_tempo                # Send test trace"
   echo "  $0 run_billing_tempo              # Run billing sample"
   echo
@@ -399,7 +428,7 @@ case "${1:-help}" in
     check_tempo_connectivity
     ;;
   "query_tempo")
-    query_tempo_traces "${2:-billing-service}" "${3:-10}"
+    query_tempo_traces "${2:-}" "${3:-10}"
     ;;
   "get_tempo_trace")
     if [ -z "${2:-}" ]; then

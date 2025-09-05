@@ -1,0 +1,48 @@
+# OpenTelemetry Tools - Git Ignore File
+# Temporary and runtime files that should not be committed
+
+# Session cookies and authentication files
+cookies.txt
+*.cookies
+
+# Temporary files created by diagnostic scripts
+/tmp/tempo_*.json
+/tmp/jaeger_*.json
+**/tmp/
+
+# Docker runtime files
+.env
+*.env.local
+
+# Log files
+*.log
+logs/
+*.out
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS generated files
+Thumbs.db
+*.tmp
+
+# Docker volumes data (if any get created locally)
+*-data/
+grafana-data/
+tempo-data/
+prometheus-data/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Test artifacts
+test-results/
+coverage/
+

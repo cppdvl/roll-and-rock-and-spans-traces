@@ -12,18 +12,15 @@ services:
       - ./tempo-config.yaml:/etc/tempo.yaml:ro
       - tempo-data:/tmp/tempo
     user: "0:0"  # Run as root to avoid permission issues
+    environment:
+      - TEMPO_CONFIG_FILE=/etc/tempo.yaml
     ports:
       - "3200:3200"     # Tempo HTTP API
-      - "4320:4317"     # OTLP gRPC receiver (different port to avoid Jaeger conflict)
-      - "4319:4318"     # OTLP HTTP receiver (different port to avoid Jaeger conflict)
+      - "4317:4317"     # OTLP gRPC receiver (standard port)
+      - "4318:4318"     # OTLP HTTP receiver (standard port)
       - "14251:14250"   # Jaeger gRPC receiver (different port to avoid conflict)
     networks:
       - tempo-network
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3200/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Grafana - Visualization and dashboards
   grafana:
@@ -41,30 +38,14 @@ services:
     networks:
       - tempo-network
     depends_on:
-      tempo:
-        condition: service_healthy
+      - tempo
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # OpenTelemetry Collector configured for Tempo
-  otel-collector-tempo:
-    image: otel/opentelemetry-collector-contrib:latest
-    container_name: otel-collector-tempo
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    volumes:
-      - ./otel-collector-tempo-config.yaml:/etc/otel-collector-config.yaml:ro
-    ports:
-      - "4319:4318"     # OTLP HTTP receiver (different port to avoid conflict)
-      - "4320:4317"     # OTLP gRPC receiver (different port to avoid conflict)
-      - "8890:8888"     # Prometheus metrics (different port to avoid conflict)
-    networks:
-      - tempo-network
-    depends_on:
-      tempo:
-        condition: service_healthy
+  # Note: OpenTelemetry Collector removed - Tempo has built-in OTLP receivers
 
   # Prometheus for metrics (optional, complements tracing)
   prometheus:
