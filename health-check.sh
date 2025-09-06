@@ -24,7 +24,8 @@
 # SOFTWARE.
 
 # Quick health check for all OpenTelemetry stacks
-echo "🏥 OpenTelemetry Stack Health Check"
+VERSION=$(cat "$(dirname "$0")/VERSION" 2>/dev/null || echo "unknown")
+echo "🏥 OpenTelemetry Stack Health Check v$VERSION"
 echo "==================================="
 echo ""
 
